@@ -1,0 +1,5 @@
+# Minified JavaScript files
+*.min.js
+
+# Output files
+output_1c.txt
