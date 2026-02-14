@@ -1,6 +1,8 @@
 import sys
 import json
 import re
+import argparse
+import os
 
 def convert_to_1c77_format(data):
     """
@@ -28,20 +30,18 @@ def convert_to_1c77_format(data):
 
         if isinstance(value, str):
             # Эвристика для дат "ДД.ММ.ГГГГ"
-            if (key_context in ('DAT_KL', 'DAT_OD')) and re.match(r'^\d{2}\.\d{2}\.\d{4}$', value):
+            if re.match(r'^\d{2}\.\d{2}\.\d{4}$', value):
                 day, month, year = value.split('.')
                 return format_value('D', f'{year}{month}{day}')
             
             # Эвристика для числовых строк
-            if key_context in ('SUM', 'SUM_E'):
-                try:
-                    float(value)  # Проверка, можно ли преобразовать в число
-                    return format_value('N', value)
-                except ValueError:
-                    pass  # Если нет, будет обработано как обычная строка
-
-            # Для всех остальных строк, включая дату-время
-            return format_value('S', value)
+            try:
+                if value.strip() == '': raise ValueError
+                float(value)  # Проверка, можно ли преобразовать в число
+                return format_value('N', value)
+            except (ValueError, TypeError):
+                # Для всех остальных строк, включая дату-время
+                return format_value('S', value)
 
         if isinstance(value, list):
             # Сериализация списка в СписокЗначений с ключами-индексами (начиная с 1)
@@ -63,21 +63,36 @@ def convert_to_1c77_format(data):
     return serialize(data)
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Ошибка: JSON-строка не передана в аргументах.", file=sys.stderr)
-        print("Пример: python json_to_1c.py '<json_string>'", file=sys.stderr)
+    parser = argparse.ArgumentParser(description="Конвертирует JSON-файл в формат 1С 7.7 'СписокЗначений'.")
+    parser.add_argument("input_file", help="Путь к входному JSON-файлу.")
+    parser.add_argument("-o", "--output_file", help="Путь к выходному файлу. Если не указан, вывод будет направлен в консоль.")
+
+    args = parser.parse_args()
+
+    if not os.path.exists(args.input_file):
+        print(f"Ошибка: Входной файл '{args.input_file}' не найден.", file=sys.stderr)
         sys.exit(1)
 
-    json_input_str = sys.argv[1]
-
     try:
-        # Загружаем данные из JSON-строки
-        parsed_data = json.loads(json_input_str)
-        # Конвертируем и выводим результат
+        with open(args.input_file, 'r', encoding='utf-8') as f:
+            json_content = f.read()
+        
+        parsed_data = json.loads(json_content)
         result = convert_to_1c77_format(parsed_data)
-        print(result)
+
+        if args.output_file:
+            with open(args.output_file, 'w', encoding='utf-8') as outfile:
+                outfile.write(result)
+            print(f"Результат сохранен в файл '{args.output_file}'", file=sys.stderr)
+        else:
+            print(result)
+
     except json.JSONDecodeError:
-        print("Ошибка: Переданная строка не является валидным JSON.", file=sys.stderr)
+        print(f"Ошибка: Файл '{args.input_file}' содержит невалидный JSON.", file=sys.stderr)
+        sys.exit(1)
+    except FileNotFoundError:
+        # Это должно быть перехвачено os.path.exists, но на всякий случай
+        print(f"Ошибка: Входной файл '{args.input_file}' не найден.", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
         print(f"Произошла непредвиденная ошибка: {e}", file=sys.stderr)
