@@ -29,19 +29,7 @@ def convert_to_1c77_format(data):
             return format_value('N', str(value))
 
         if isinstance(value, str):
-            # Эвристика для дат "ДД.ММ.ГГГГ"
-            if re.match(r'^\d{2}\.\d{2}\.\d{4}$', value):
-                day, month, year = value.split('.')
-                return format_value('D', f'{year}{month}{day}')
-            
-            # Эвристика для числовых строк
-            try:
-                if value.strip() == '': raise ValueError
-                float(value)  # Проверка, можно ли преобразовать в число
-                return format_value('N', value)
-            except (ValueError, TypeError):
-                # Для всех остальных строк, включая дату-время
-                return format_value('S', value)
+            return format_value('S', value)
 
         if isinstance(value, list):
             # Сериализация списка в СписокЗначений с ключами-индексами (начиная с 1)
